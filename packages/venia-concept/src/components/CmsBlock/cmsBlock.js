@@ -1,65 +1,57 @@
 import React, { Component } from 'react';
-import { array, func, oneOfType, shape, string } from 'prop-types';
+import { PropTypes } from 'prop-types';
 import { Query } from 'react-apollo';
-
+import gql from 'graphql-tag';
 import classify from 'src/classify';
-import Block from './block';
 import defaultClasses from './cmsBlock.css';
-import getCmsBlocks from '../../queries/getCmsBlocks.graphql';
 
-class CmsBlockGroup extends Component {
+const cmsBlockQuery = gql`
+    query cmsBlocks($identifiers: [String]!) {
+        cmsBlocks(identifiers: $identifiers) {
+            items {
+                content
+            }
+        }
+    }
+`;
+
+class CmsBlock extends Component {
     static propTypes = {
-        children: func,
-        classes: shape({
-            block: string,
-            content: string,
-            root: string
+        classes: PropTypes.shape({
+            root: PropTypes.string,
+            content: PropTypes.string
         }),
-        identifiers: oneOfType([string, array])
-    };
-
-    renderBlocks = ({ data, error, loading }) => {
-        const { children, classes } = this.props;
-
-        if (error) {
-            return <div>Data Fetch Error</div>;
-        }
-
-        if (loading) {
-            return <div>Fetching Data</div>;
-        }
-
-        const { items } = data.blocks;
-
-        if (!Array.isArray(items) || !items.length) {
-            return <div>There are no blocks to display</div>;
-        }
-
-        const BlockChild = typeof children === 'function' ? children : Block;
-        const blocks = items.map((item, index) => (
-            <BlockChild
-                key={item.identifier}
-                className={classes.block}
-                index={index}
-                {...item}
-            />
-        ));
-
-        return <div className={classes.content}>{blocks}</div>;
+        identifiers: PropTypes.oneOfType([PropTypes.string, PropTypes.array])
     };
 
     render() {
-        const { props, renderBlocks } = this;
-        const { classes, identifiers } = props;
-
+        const { identifiers, classes } = this.props;
         return (
             <div className={classes.root}>
-                <Query query={getCmsBlocks} variables={{ identifiers }}>
-                    {renderBlocks}
+                <Query query={cmsBlockQuery} variables={{ identifiers }}>
+                    {({ loading, error, data }) => {
+                        if (error) return <div>Data Fetch Error</div>;
+                        if (loading) return <div>Fetching Data</div>;
+                        if (data.cmsBlocks.items == '')
+                            return <div>Here is not any block(s)</div>;
+
+                        return (
+                            <div className={classes.content}>
+                                {data.cmsBlocks.items.map((item, index) => (
+                                    <div
+                                        key={index}
+                                        dangerouslySetInnerHTML={{
+                                            __html: item.content
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        );
+                    }}
                 </Query>
             </div>
         );
     }
 }
 
-export default classify(defaultClasses)(CmsBlockGroup);
+export default classify(defaultClasses)(CmsBlock);
